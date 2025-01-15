@@ -2285,6 +2285,32 @@ func RemoveKeyspace(in SQLNode) {
 	})
 }
 
+// RemoveSpecificKeyspace removes the keyspace qualifier from all ColName and TableName
+// when it matches the keyspace provided
+func RemoveSpecificKeyspace(in SQLNode, keyspace string) {
+	removeKeyspace(in, func(qualifier string) bool {
+		return qualifier == keyspace // Remove only if it matches the provided keyspace
+	})
+}
+
+
+func removeKeyspace(in SQLNode, shouldRemove func(qualifier string) bool) {
+	Rewrite(in, nil, func(cursor *Cursor) bool {
+		switch expr := cursor.Node().(type) {
+		case *ColName:
+			if shouldRemove(expr.Qualifier.Qualifier.String()) {
+				expr.Qualifier.Qualifier = NewIdentifierCS("")
+			}
+		case TableName:
+			if shouldRemove(expr.Qualifier.String()) {
+				expr.Qualifier = NewIdentifierCS("")
+				cursor.Replace(expr)
+			}
+		}
+		return true
+	})
+}
+
 // RemoveKeyspaceIgnoreSysSchema removes the Qualifier.Qualifier on all ColNames and Qualifier on all TableNames in the AST
 // except for the system schema.
 func RemoveKeyspaceIgnoreSysSchema(in SQLNode) {
