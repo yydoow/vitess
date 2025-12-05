@@ -14,4 +14,4 @@ dwbuild-percona80:
     --platform linux/amd64 \
     -f docker/lite/Dockerfile.$${MYSQL_FLAVOR_VERSION} \
     -t docker.ihs.demonware.net/platform-dbtech/vitess-lite:v$${VITESS_VERSION}-$${MYSQL_FLAVOR_VERSION}-$${GITHASH} \
-    --build-arg bootstrap_version=$${BOOTSTRAP_VERSION} .
+    --build-arg bootstrap_version=$${BOOTSTRAP_VERSION} .	

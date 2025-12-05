@@ -1,0 +1,6 @@
+FROM vitess/bootstrap:32.8-percona80
+RUN go install golang.org/x/tools/cmd/goimports@v0.24.0
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends zstd pigz lz4 lzop bzip2 lzma
+WORKDIR /vt/src/vitess.io/vitess
+USER vitess
