@@ -126,7 +126,7 @@ jobs:
         sudo rm -rf /etc/mysql
 
         # Get key to latest MySQL repo
-        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A8D3785C
+        wget -qO- https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | sudo apt-key add -
 
         wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.33-1_all.deb
         # Bionic packages are still compatible for Jammy since there's no MySQL 5.7
