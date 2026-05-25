@@ -1232,7 +1232,6 @@ func TestCloseDuringWaitForConn(t *testing.T) {
 				for !closed.Load() {
 					timeout := time.After(getTimeout)
 					getCtx, getCancel := context.WithTimeout(ctx, getTimeout/3)
-					defer getCancel()
 					done := make(chan struct{})
 					go func() {
 						defer close(done)
@@ -1245,9 +1244,11 @@ func TestCloseDuringWaitForConn(t *testing.T) {
 					}()
 					select {
 					case <-timeout:
+						getCancel()
 						hung <- struct{}{}
 						return
 					case <-done:
+						getCancel()
 					}
 				}
 			}()
@@ -1327,9 +1328,8 @@ func TestIdleTimeoutConnectionLeak(t *testing.T) {
 	// This should trigger the bug where connections get discarded
 	for i := 0; i < 2; i++ {
 		getCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
-
 		conn, err := p.Get(getCtx, nil)
+		cancel()
 		require.NoError(t, err)
 
 		p.put(conn)
