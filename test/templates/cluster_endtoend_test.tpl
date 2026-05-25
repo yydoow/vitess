@@ -118,6 +118,7 @@ jobs:
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb
         sudo DEBIAN_FRONTEND="noninteractive" dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         sudo percona-release setup ps80
+        sudo percona-release setup pxb-80
         sudo apt-get -qq update
 
         # Install everything else we need, and configure
@@ -225,7 +226,7 @@ jobs:
         fi
 
         # print test output
-        cat output.txt
+        cat output.txt || true
 
     - name: Test Summary
       if: steps.skip-workflow.outputs.skip-workflow == 'false' && steps.changes.outputs.end_to_end == 'true' && always()
