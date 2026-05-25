@@ -311,6 +311,28 @@ func TestSchemaChange(t *testing.T) {
 					require.Fail(t, "context cancelled")
 				}
 			})
+			t.Run("apply more DML", func(t *testing.T) {
+				// Looking to run a substantial amount of DML, giving vreplication
+				// more "opportunities" to throttle or to make progress.
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
+
+				startDML := totalAppliedDML.Load()
+				for {
+					appliedDML := totalAppliedDML.Load()
+					if appliedDML-startDML >= int64(maxTableRows) {
+						// We have generated enough DMLs
+						return
+					}
+					select {
+					case <-ticker.C:
+					case <-ctx.Done():
+						require.Fail(t, "timeout waiting for applied DML")
+					}
+				}
+			})
 			t.Run("validate applied DML", func(t *testing.T) {
 				// Validate that during Online DDL, and even with throttling, we were
 				// able to produce meaningful traffic.
