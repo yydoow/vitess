@@ -172,7 +172,7 @@ jobs:
         fi
 
         # print test output
-        cat output.txt
+        cat output.txt || true
 
     - name: Test Summary
       if: steps.skip-workflow.outputs.skip-workflow == 'false' && steps.changes.outputs.end_to_end == 'true' && always()
