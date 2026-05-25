@@ -17,7 +17,7 @@ jobs:
   build:
     timeout-minutes: 60
     name: Run endtoend tests on Cluster (onlineddl_vrepl_suite)
-    runs-on: ubuntu-24.04
+    runs-on: gh-hosted-runners-16cores-1-24.04
 
     steps:
     - name: Skip CI
@@ -98,12 +98,6 @@ jobs:
       timeout-minutes: 10
       run: |
         
-        # Get key to latest MySQL repo
-        sudo apt-key adv --fetch-keys https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-        # Setup MySQL 8.0
-        wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.33-1_all.deb
-        echo mysql-apt-config mysql-apt-config/select-server select mysql-8.0 | sudo debconf-set-selections
-        sudo DEBIAN_FRONTEND="noninteractive" dpkg -i mysql-apt-config*
         sudo apt-get -qq update
 
         # We have to install this old version of libaio1 in case we end up testing with MySQL 5.7. See also:
