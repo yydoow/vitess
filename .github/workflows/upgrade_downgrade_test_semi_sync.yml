@@ -1,7 +1,12 @@
 name: Semi Sync Upgrade Downgrade Testing
 on:
   push:
+    branches:
+      - "main"
+      - "release-[0-9]+.[0-9]"
+    tags: '**'
   pull_request:
+    branches: '**'
 
 concurrency:
   group: format('{0}-{1}', ${{ github.ref }}, 'Semi Sync Upgrade Downgrade Testing')
@@ -13,7 +18,7 @@ jobs:
   upgrade_downgrade_test_e2e:
     timeout-minutes: 60
     name: Run Semi Sync Upgrade Downgrade Test
-    runs-on: gh-hosted-runners-16cores-1-24.04
+    runs-on: ${{ github.repository == 'vitessio/vitess' && 'gh-hosted-runners-16cores-1-24.04' || 'ubuntu-24.04' }}
 
     steps:
     - name: Skip CI
