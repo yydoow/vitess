@@ -113,7 +113,7 @@ install_protoc() {
   esac
 
   # This is how we'd download directly from source:
-  "${VTROOT}/tools/wget-retry" -q https://github.com/protocolbuffers/protobuf/releases/download/v$version/protoc-$version-$platform-${target}.zip
+  "${VTROOT}/tools/wget-retry" -q "https://github.com/protocolbuffers/protobuf/releases/download/v${version}/protoc-${version}-${platform}-${target}.zip"
   #"${VTROOT}/tools/wget-retry" "${VITESS_RESOURCES_DOWNLOAD_URL}/protoc-$version-$platform-${target}.zip"
   unzip "protoc-$version-$platform-${target}.zip"
 
@@ -130,8 +130,18 @@ install_zookeeper() {
   # wget "https://dlcdn.apache.org/zookeeper/$zk/apache-$zk.tar.gz"
   "${VTROOT}/tools/wget-retry" -q "${VITESS_RESOURCES_DOWNLOAD_URL}/apache-${zk}.tar.gz"
   tar -xzf "$dist/apache-$zk.tar.gz"
-  mvn -q -f $dist/apache-$zk/zookeeper-contrib/zookeeper-contrib-fatjar/pom.xml clean install -P fatjar -DskipTests
-  mkdir -p $dist/lib
+  local zk_fatjar_pom="$dist/apache-$zk/zookeeper-contrib/zookeeper-contrib-fatjar/pom.xml"
+  for attempt in 1 2 3; do
+    if mvn -q -f "$zk_fatjar_pom" clean install -P fatjar -DskipTests; then
+      break
+    fi
+    if [[ "$attempt" -eq 3 ]]; then
+      return 1
+    fi
+    echo "zookeeper fatjar build failed (attempt $attempt/3), retrying..."
+    sleep 5
+  done
+  mkdir -p "$dist/lib"
   cp "$dist/apache-$zk/zookeeper-contrib/zookeeper-contrib-fatjar/target/$zk-fatjar.jar" "$dist/lib/$zk-fatjar.jar"
   rm -rf "$dist/apache-$zk"
 }
