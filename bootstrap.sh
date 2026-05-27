@@ -138,7 +138,7 @@ install_zookeeper() {
     if [[ "$attempt" -eq 3 ]]; then
       return 1
     fi
-    echo "zookeeper fatjar build failed (attempt $attempt/3), retrying..."
+    echo "zookeeper fatjar build failed (attempt $attempt/3), retrying after transient Maven Central error..."
     sleep 5
   done
   mkdir -p "$dist/lib"
