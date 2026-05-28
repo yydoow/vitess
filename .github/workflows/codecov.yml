@@ -16,7 +16,12 @@ permissions: read-all
 jobs:
   test:
     name: Code Coverage
-    runs-on: gh-hosted-runners-16cores-1-24.04
+    # Skip on forks: the upload step requires CODECOV_TOKEN, which isn't
+    # configured on forks, and Codecov no longer allows tokenless uploads
+    # ("Token required - not valid tokenless upload"). Without this gate
+    # we'd burn ~16 minutes on the test suite just to red-fail the upload.
+    if: ${{ github.repository == 'vitessio/vitess' }}
+    runs-on: ${{ github.repository == 'vitessio/vitess' && 'gh-hosted-runners-16cores-1-24.04' || 'ubuntu-24.04' }}
 
     steps:
     - name: Check out code
