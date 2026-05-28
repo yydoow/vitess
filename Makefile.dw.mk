@@ -7,7 +7,7 @@ dwbuild-percona80:
 	echo -e "Running the following build command in 5 seconds... \ndocker buildx build \
 		--platform linux/amd64 \
 		-f docker/lite/Dockerfile.$${MYSQL_FLAVOR_VERSION} \
-		-t docker.ihs.demonware.net/platform-dbtech/vitess-lite:$${VITESS_VERSION}-$${MYSQL_FLAVOR_VERSION}-$${GITHASH} \
+		-t docker.ihs.demonware.net/platform-dbtech/vitess-lite:v$${VITESS_VERSION}-$${MYSQL_FLAVOR_VERSION}-$${GITHASH} \
 		--build-arg bootstrap_version=$${BOOTSTRAP_VERSION} ." && \
 	sleep 5 && \
 	docker buildx build \
