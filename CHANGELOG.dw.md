@@ -5,7 +5,7 @@ These images are published to the `docker.ihs.demonware.net/platform-dbtech/vite
 
 ## Unreleased
 
-## [v20.0.8-percona80-1f453d9eba] - 2026-05-28
+## [v20.0.8-percona80-bc0d257409] - 2026-06-02
 ### Fixed
 - [DBT-2110](https://dev.activision.com/jira/browse/DBT-2110)
   - Backport connpool fixes from [arthurschreiber/vitess#6](https://github.com/arthurschreiber/vitess/pull/6)
