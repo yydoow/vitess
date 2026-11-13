@@ -138,6 +138,29 @@ func (cached *ConsistentLookupUnique) CachedSize(alloc bool) int64 {
 	}
 	return size
 }
+
+//go:nocheckptr
+func (cached *DemonwareModulo) CachedSize(alloc bool) int64 {
+	if cached == nil {
+		return int64(0)
+	}
+	size := int64(0)
+	if alloc {
+		size += int64(48)
+	}
+	// field name string
+	size += hack.RuntimeAllocSize(int64(len(cached.name)))
+	// field ranges map[uint16]*vitess.io/vitess/go/vt/vtgate/vindexes.demonwareModuloRange
+	if cached.ranges != nil {
+		size += hack.RuntimeMapSize(cached.ranges)
+		for _, v := range cached.ranges {
+			if v != nil {
+				size += hack.RuntimeAllocSize(int64(16))
+			}
+		}
+	}
+	return size
+}
 func (cached *Hash) CachedSize(alloc bool) int64 {
 	if cached == nil {
 		return int64(0)
