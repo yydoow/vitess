@@ -94,6 +94,32 @@ func TestDemonwareModuloInvalidInput(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestDemonwareModuloRejectsZeroDivisors(t *testing.T) {
+	tests := []struct {
+		name   string
+		params map[string]string
+		want   string
+	}{
+		{
+			name:   "zero modulo",
+			params: map[string]string{"num_ranges": "2", "modulo": "0"},
+			want:   "modulo",
+		},
+		{
+			name:   "single range with offset",
+			params: map[string]string{"num_ranges": "1", "use_offset": "true"},
+			want:   "use_offset",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := CreateVindex("demonware_modulo", t.Name(), tt.params)
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestDemonwareModuloVerify(t *testing.T) {
 	vindex, err := CreateVindex("demonware_modulo", t.Name(), map[string]string{"num_ranges": "2", "use_offset": "true"})
 	require.NoError(t, err)

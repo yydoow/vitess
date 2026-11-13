@@ -63,6 +63,9 @@ func NewDemonwareModulo(name string, params map[string]string) (Vindex, error) {
 		}
 		modulo = parsed
 	}
+	if modulo == 0 {
+		return nil, errors.New("param modulo must be greater than zero")
+	}
 
 	rawRanges, ok := params["num_ranges"]
 	if !ok {
@@ -80,6 +83,9 @@ func NewDemonwareModulo(name string, params map[string]string) (Vindex, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if useOffset && numRanges == 1 {
+		return nil, errors.New("param use_offset requires num_ranges greater than one")
 	}
 
 	shardSpecs, err := key.GenerateShardRanges(int(numRanges), 0)
