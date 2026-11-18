@@ -234,6 +234,31 @@ func TestDemonwareModuloRejectsZeroDivisors(t *testing.T) {
 	}
 }
 
+func TestDemonwareModuloUnknownParams(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		params map[string]string
+		want   []string
+	}{
+		{
+			name:   "known parameters",
+			params: map[string]string{"num_ranges": "2", "modulo": "65536", "use_offset": "true"},
+		},
+		{
+			name:   "misspelled parameter",
+			params: map[string]string{"num_ranges": "2", "use_ofset": "true"},
+			want:   []string{"use_ofset"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			vindex, err := CreateVindex("demonware_modulo", t.Name(), tt.params)
+			require.NoError(t, err)
+			require.Implements(t, (*ParamValidating)(nil), vindex)
+			require.Equal(t, tt.want, vindex.(ParamValidating).UnknownParams())
+		})
+	}
+}
+
 func TestDemonwareModuloVerify(t *testing.T) {
 	vindex, err := CreateVindex("demonware_modulo", t.Name(), map[string]string{"num_ranges": "2", "use_offset": "true"})
 	require.NoError(t, err)

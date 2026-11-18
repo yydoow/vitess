@@ -31,18 +31,30 @@ import (
 const defaultModulo uint64 = 65536
 
 var (
-	_ SingleColumn = (*DemonwareModulo)(nil)
-	_ Hashing      = (*DemonwareModulo)(nil)
+	_ SingleColumn    = (*DemonwareModulo)(nil)
+	_ Hashing         = (*DemonwareModulo)(nil)
+	_ ParamValidating = (*DemonwareModulo)(nil)
 
 	errNumRangesRequired = errors.New("param num_ranges is required")
 )
 
+// DemonwareModulo partitions the keyspace into num_ranges ranges. For each
+// ID, it computes ID % modulo, then assigns that value to a range using
+// (ID % modulo) % num_ranges. Without use_offset, the keyspace ID is the
+// start of that range. With use_offset, ID / num_ranges is used to spread
+// keyspace IDs within the range.
+//
+// The default modulo is 65536, matching Demonware's sharding setup before
+// migrating to Vitess. Shards may be added by resharding without changing
+// num_ranges. Do not change modulo, num_ranges, or use_offset after data has
+// been inserted: doing so changes the mapping of existing IDs.
 type DemonwareModulo struct {
-	modulo    uint64
-	name      string
-	numRanges uint16
-	ranges    map[uint16]*demonwareModuloRange
-	useOffset bool
+	modulo        uint64
+	name          string
+	numRanges     uint16
+	ranges        map[uint16]*demonwareModuloRange
+	useOffset     bool
+	unknownParams []string
 }
 
 type demonwareModuloRange struct {
@@ -112,12 +124,18 @@ func NewDemonwareModulo(name string, params map[string]string) (Vindex, error) {
 	}
 
 	return &DemonwareModulo{
-		modulo:    modulo,
-		name:      name,
-		numRanges: numRanges,
-		ranges:    ranges,
-		useOffset: useOffset,
+		modulo:        modulo,
+		name:          name,
+		numRanges:     numRanges,
+		ranges:        ranges,
+		useOffset:     useOffset,
+		unknownParams: FindUnknownParams(params, []string{"modulo", "num_ranges", "use_offset"}),
 	}, nil
+}
+
+// UnknownParams implements the ParamValidating interface.
+func (vind *DemonwareModulo) UnknownParams() []string {
+	return vind.unknownParams
 }
 
 func (vind *DemonwareModulo) String() string {
