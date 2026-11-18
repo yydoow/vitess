@@ -18,6 +18,10 @@ package vindexes
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -79,6 +83,116 @@ func TestDemonwareModuloRouting(t *testing.T) {
 	}
 }
 
+func TestDemonwareModuloTwentyRanges(t *testing.T) {
+	starts := []byte{
+		0x00, 0x0c, 0x19, 0x26, 0x33, 0x40, 0x4c, 0x59, 0x66, 0x73,
+		0x80, 0x8c, 0x99, 0xa6, 0xb3, 0xc0, 0xcc, 0xd9, 0xe6, 0xf3,
+	}
+
+	for _, useOffset := range []bool{false, true} {
+		t.Run(strconv.FormatBool(useOffset), func(t *testing.T) {
+			params := map[string]string{"num_ranges": "20", "use_offset": strconv.FormatBool(useOffset)}
+			vindex, err := CreateVindex("demonware_modulo", t.Name(), params)
+			require.NoError(t, err)
+
+			ids := make([]sqltypes.Value, 0, 61)
+			for id := int64(0); id < 60; id++ {
+				ids = append(ids, sqltypes.NewInt64(id))
+			}
+			ids = append(ids, sqltypes.NULL)
+
+			destinations, err := vindex.(*DemonwareModulo).Map(context.Background(), nil, ids)
+			require.NoError(t, err)
+			require.Len(t, destinations, len(ids))
+			for id := 0; id < 60; id++ {
+				offset := 0
+				if useOffset {
+					offset = id / len(starts)
+				}
+				require.Equal(t,
+					fmt.Sprintf("DestinationKeyspaceID(%02x%014x)", starts[id%len(starts)], offset),
+					destinations[id].String(), "id=%d", id)
+			}
+			require.Equal(t, key.DestinationNone{}, destinations[60])
+		})
+	}
+}
+
+func TestDemonwareModuloExternalShardLayouts(t *testing.T) {
+	for _, numRanges := range []int{98, 196, 206, 214, 322} {
+		t.Run(strconv.Itoa(numRanges), func(t *testing.T) {
+			vindex, err := CreateVindex("demonware_modulo", t.Name(), map[string]string{
+				"num_ranges": strconv.Itoa(numRanges),
+			})
+			require.NoError(t, err)
+
+			legacySpecs := legacyModuloShardSpecs(numRanges)
+			currentSpecs, err := key.GenerateShardRanges(numRanges, 0)
+			require.NoError(t, err)
+			require.Len(t, currentSpecs, numRanges)
+
+			legacyMiddle, _, _ := strings.Cut(legacySpecs[numRanges/2], "-")
+			currentMiddle, _, _ := strings.Cut(currentSpecs[numRanges/2], "-")
+			if numRanges <= 256 {
+				require.Equal(t, "7f", legacyMiddle)
+				require.Equal(t, "80", currentMiddle)
+			} else {
+				require.Equal(t, "7fff", legacyMiddle)
+				require.Equal(t, "8000", currentMiddle)
+			}
+
+			ids := make([]uint64, 0, 3*numRanges+4)
+			for id := uint64(0); id < uint64(3*numRanges); id++ {
+				ids = append(ids, id)
+			}
+			ids = append(ids, 65535, 65536, 65537, math.MaxUint64)
+
+			for name, specs := range map[string][]string{"v18": legacySpecs, "v23": currentSpecs} {
+				t.Run(name, func(t *testing.T) {
+					for _, id := range ids {
+						destinations, err := vindex.(*DemonwareModulo).Map(context.Background(), nil,
+							[]sqltypes.Value{sqltypes.NewUint64(id)})
+						require.NoError(t, err)
+						require.Len(t, destinations, 1)
+						ksid, ok := destinations[0].(key.DestinationKeyspaceID)
+						require.True(t, ok, "id=%d", id)
+
+						shardIndex := int((id % 65536) % uint64(numRanges))
+						shardRanges, err := key.ParseShardingSpec(specs[shardIndex])
+						require.NoError(t, err)
+						require.Len(t, shardRanges, 1)
+						require.True(t, key.KeyRangeContains(shardRanges[0], ksid),
+							"layout=%s id=%d shard=%d ksid=%x", name, id, shardIndex, ksid)
+					}
+				})
+			}
+		})
+	}
+}
+
+func legacyModuloShardSpecs(numRanges int) []string {
+	maxBoundary, hexWidth := 256, 2
+	if numRanges > 256 {
+		maxBoundary, hexWidth = 65536, 4
+	}
+
+	specs := make([]string, numRanges)
+	start := 0
+	for shard := 0; shard < numRanges; shard++ {
+		end := int(float64(shard+1) * (float64(maxBoundary) / float64(numRanges)))
+		startLabel, endLabel := "", ""
+		if start != 0 {
+			startLabel = fmt.Sprintf("%0*x", hexWidth, start)
+		}
+		if end != maxBoundary {
+			endLabel = fmt.Sprintf("%0*x", hexWidth, end)
+		}
+		specs[shard] = startLabel + "-" + endLabel
+		start = end
+	}
+	return specs
+}
+
 func TestDemonwareModuloInvalidInput(t *testing.T) {
 	_, err := CreateVindex("demonware_modulo", t.Name(), nil)
 	require.Error(t, err)
@@ -125,8 +239,17 @@ func TestDemonwareModuloVerify(t *testing.T) {
 	require.NoError(t, err)
 	modulo := vindex.(*DemonwareModulo)
 	matches, err := modulo.Verify(context.Background(), nil,
-		[]sqltypes.Value{sqltypes.NewInt64(2), sqltypes.NewInt64(3)},
-		[][]byte{{0, 0, 0, 0, 0, 0, 0, 1}, {0x80, 0, 0, 0, 0, 0, 0, 4}})
+		[]sqltypes.Value{
+			sqltypes.NewInt64(0), sqltypes.NewInt64(1), sqltypes.NewInt64(2),
+			sqltypes.NewInt64(3), sqltypes.NewInt64(4),
+		},
+		[][]byte{
+			{0, 0, 0, 0, 0, 0, 0, 0},
+			{0x80, 0, 0, 0, 0, 0, 0, 0},
+			{0, 0, 0, 0, 0, 0, 0, 1},
+			{0x80, 0, 0, 0, 0, 0, 0, 1},
+			{0, 0, 0, 0, 0, 0, 0, 4},
+		})
 	require.NoError(t, err)
-	require.Equal(t, []bool{true, false}, matches)
+	require.Equal(t, []bool{true, true, true, true, false}, matches)
 }
