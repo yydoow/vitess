@@ -146,7 +146,7 @@ func (cached *DemonwareModulo) CachedSize(alloc bool) int64 {
 	}
 	size := int64(0)
 	if alloc {
-		size += int64(48)
+		size += int64(80)
 	}
 	// field name string
 	size += hack.RuntimeAllocSize(int64(len(cached.name)))
@@ -157,6 +157,13 @@ func (cached *DemonwareModulo) CachedSize(alloc bool) int64 {
 			if v != nil {
 				size += hack.RuntimeAllocSize(int64(16))
 			}
+		}
+	}
+	// field unknownParams []string
+	{
+		size += hack.RuntimeAllocSize(int64(cap(cached.unknownParams)) * int64(16))
+		for _, elem := range cached.unknownParams {
+			size += hack.RuntimeAllocSize(int64(len(elem)))
 		}
 	}
 	return size
