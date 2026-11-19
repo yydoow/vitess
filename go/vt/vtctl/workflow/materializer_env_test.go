@@ -433,7 +433,14 @@ func (tmc *testMaterializerTMClient) VReplicationExec(ctx context.Context, table
 
 func (tmc *testMaterializerTMClient) ExecuteFetchAsDba(ctx context.Context, tablet *topodatapb.Tablet, usePool bool, req *tabletmanagerdatapb.ExecuteFetchAsDbaRequest) (*querypb.QueryResult, error) {
 	// Reuse VReplicationExec
-	return tmc.VReplicationExec(ctx, tablet, string(req.Query))
+	result, err := tmc.VReplicationExec(ctx, tablet, string(req.Query))
+	if err != nil {
+		return nil, err
+	}
+	if maxRows := int(req.MaxRows); maxRows >= 0 && len(result.Rows) > maxRows {
+		return nil, vterrors.Errorf(vtrpcpb.Code_ABORTED, "Row count exceeded %d", maxRows)
+	}
+	return result, nil
 }
 
 func (tmc *testMaterializerTMClient) ExecuteFetchAsAllPrivs(ctx context.Context, tablet *topodatapb.Tablet, req *tabletmanagerdatapb.ExecuteFetchAsAllPrivsRequest) (*querypb.QueryResult, error) {
