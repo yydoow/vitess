@@ -2456,6 +2456,15 @@ func TestGetWorkflowsStreamLogs(t *testing.T) {
 }
 
 func TestWorkflowStatus(t *testing.T) {
+	for _, tableCount := range []int{2, 2001} {
+		t.Run(fmt.Sprintf("%d_tables", tableCount), func(t *testing.T) {
+			testWorkflowStatus(t, tableCount)
+		})
+	}
+}
+
+func testWorkflowStatus(t *testing.T, tableCount int) {
+	t.Helper()
 	ctx := context.Background()
 
 	sourceKeyspace := "source_keyspace"
@@ -2465,30 +2474,40 @@ func TestWorkflowStatus(t *testing.T) {
 	sourceShards := []string{"-"}
 	targetShards := []string{"-"}
 
+	tableSettings := make([]*vtctldatapb.TableMaterializeSettings, tableCount)
+	tables := make([]string, tableCount)
+	quotedTables := make([]string, tableCount)
+	targetRows := make([]string, tableCount)
+	sourceRows := make([]string, tableCount)
+	for i := range tables {
+		table := fmt.Sprintf("table%d", i+1)
+		tables[i] = table
+		quotedTables[i] = fmt.Sprintf("'%s'", table)
+		tableSettings[i] = &vtctldatapb.TableMaterializeSettings{
+			TargetTable:      table,
+			SourceExpression: "select * from " + table,
+		}
+		targetRows[i] = fmt.Sprintf("%s|%d|%d", table, 50*(i+1), 500/(i+1))
+		sourceRows[i] = fmt.Sprintf("%s|%d|%d", table, 100*(i+1), 1000/(i+1))
+	}
+	sort.Strings(quotedTables)
+	tableList := strings.Join(quotedTables, ",")
+
 	te := newTestMaterializerEnv(t, ctx, &vtctldatapb.MaterializeSettings{
 		SourceKeyspace: sourceKeyspace,
 		TargetKeyspace: targetKeyspace,
 		Workflow:       workflow,
-		TableSettings: []*vtctldatapb.TableMaterializeSettings{
-			{
-				TargetTable:      "table1",
-				SourceExpression: fmt.Sprintf("select * from %s", "table1"),
-			},
-			{
-				TargetTable:      "table2",
-				SourceExpression: fmt.Sprintf("select * from %s", "table2"),
-			},
-		},
+		TableSettings:  tableSettings,
 	}, sourceShards, targetShards)
 
-	tablesResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name", "varchar"), "table1", "table2")
+	tablesResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name", "varchar"), tables...)
 	te.tmc.expectVRQuery(200, "select distinct table_name from _vt.copy_state cs, _vt.vreplication vr where vr.id = cs.vrepl_id and vr.id = 1", tablesResult)
 
-	tablesTargetCopyResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name|table_rows|data_length", "varchar|int64|int64"), "table1|50|500", "table2|100|250")
-	te.tmc.expectVRQuery(200, "select table_name, table_rows, data_length from information_schema.tables where table_schema = 'vt_target_keyspace' and table_name in ('table1','table2')", tablesTargetCopyResult)
+	tablesTargetCopyResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name|table_rows|data_length", "varchar|int64|int64"), targetRows...)
+	te.tmc.expectVRQuery(200, fmt.Sprintf("select table_name, table_rows, data_length from information_schema.tables where table_schema = 'vt_target_keyspace' and table_name in (%s)", tableList), tablesTargetCopyResult)
 
-	tablesSourceCopyResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name|table_rows|data_length", "varchar|int64|int64"), "table1|100|1000", "table2|200|500")
-	te.tmc.expectVRQuery(100, "select table_name, table_rows, data_length from information_schema.tables where table_schema = 'vt_source_keyspace' and table_name in ('table1','table2')", tablesSourceCopyResult)
+	tablesSourceCopyResult := sqltypes.MakeTestResult(sqltypes.MakeTestFields("table_name|table_rows|data_length", "varchar|int64|int64"), sourceRows...)
+	te.tmc.expectVRQuery(100, fmt.Sprintf("select table_name, table_rows, data_length from information_schema.tables where table_schema = 'vt_source_keyspace' and table_name in (%s)", tableList), tablesSourceCopyResult)
 
 	te.tmc.expectVRQuery(200, "select vrepl_id, table_name, lastpk from _vt.copy_state where vrepl_id in (1) and id in (select max(id) from _vt.copy_state where vrepl_id in (1) group by vrepl_id, table_name)", &sqltypes.Result{})
 
@@ -2498,9 +2517,9 @@ func TestWorkflowStatus(t *testing.T) {
 		Shards:   targetShards,
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	require.NotNil(t, res.TableCopyState)
+	require.Len(t, res.TableCopyState, tableCount)
 
 	stateTable1 := res.TableCopyState["table1"]
 	stateTable2 := res.TableCopyState["table2"]
